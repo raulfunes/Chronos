@@ -1,0 +1,4 @@
+com/chronos/api/integration/service/IntegrationServiceTest.class
+com/chronos/api/session/service/FocusSessionServiceTest.class
+com/chronos/api/common/logging/RequestTracingFilterTest.class
+com/chronos/api/common/exception/GlobalExceptionHandlerTest.class

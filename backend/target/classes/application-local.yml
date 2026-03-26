@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3307/chronos
+    username: chronos
+    password: chronos
+  flyway:
+    url: jdbc:mysql://127.0.0.1:3307/chronos
+    user: chronos
+    password: chronos
+
+server:
+  port: 8082
+
+chronos:
+  jwt:
+    secret: chronos-super-secret-key-chronos-super-secret-key
+  integrations:
+    encryption-key: chronos-integration-key-chronos-integration-key
+    frontend-base-url: http://localhost:3000
+    spotify:
+      enabled: false
+      client-id: ""
+      client-secret: ""
+      redirect-uri: http://localhost:8082/api/v1/integrations/spotify/callback
