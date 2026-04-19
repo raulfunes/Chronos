@@ -125,6 +125,16 @@ export function useFocusSessionController() {
     showError,
   } = useChronos();
 
+  function notify(title: string, body?: string) {
+    if (!settings.desktopNotifications || !('Notification' in window)) return;
+    const send = () => new Notification(title, { body, icon: '/favicon.ico' });
+    if (Notification.permission === 'granted') {
+      send();
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then((perm) => { if (perm === 'granted') send(); });
+    }
+  }
+
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('SINGLE');
   const [selectedType, setSelectedType] = useState<SessionType>('POMODORO');
   const [selectedGoalId, setSelectedGoalId] = useState<number | ''>('');
@@ -647,10 +657,16 @@ export function useFocusSessionController() {
     const nextIndex = customActiveIndex + 1;
     if (nextIndex >= customBlocks.length) {
       restoreCustomBuilder(customBlocks, true);
+      notify('Schedule complete!', 'Great work. All blocks done.');
       playSessionCompleteCue();
       return;
     }
 
+    const nextBlock = customBlocks[nextIndex];
+    notify(
+      `${SESSION_LABELS[completedBlock.type]} done!`,
+      `Next: ${SESSION_LABELS[nextBlock.type]} (${nextBlock.durationMinutes} min)`,
+    );
     startCustomTransition(completedBlock, nextIndex);
   }
 
@@ -787,6 +803,7 @@ export function useFocusSessionController() {
     setIsRunning(false);
     await completeSession(sessionId);
     setActiveSessionId(null);
+    notify(`${SESSION_LABELS[selectedType]} complete!`);
     playSessionCompleteCue();
   }
 
