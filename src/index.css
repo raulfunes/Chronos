@@ -17,6 +17,11 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+    --chronos-desktop-scale: 0.9;
+  }
+
   body {
     @apply bg-background text-on-surface font-body antialiased;
   }
@@ -38,4 +43,97 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(91, 65, 57, 0.15);
   border-radius: 10px;
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 180ms ease-out forwards;
+}
+
+.interactive-range {
+  cursor: grab;
+  transition: opacity 180ms ease;
+}
+
+.interactive-range:active {
+  cursor: grabbing;
+}
+
+.interactive-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.dark-select {
+  color-scheme: dark;
+}
+
+.desktop-focus-shell,
+.desktop-focus-main {
+  height: 100dvh;
+}
+
+@media (min-width: 1280px) {
+  .desktop-app-scale {
+    transform-origin: top left;
+  }
+
+  .desktop-focus-shell,
+  .desktop-focus-main {
+    height: 100vh;
+  }
+}
+
+@supports (zoom: 1) {
+  @media (min-width: 1280px) {
+    .desktop-app-scale {
+      zoom: var(--chronos-desktop-scale);
+      width: 100%;
+      min-height: calc(100vh / var(--chronos-desktop-scale));
+      transform: none;
+    }
+
+    .desktop-focus-shell,
+    .desktop-focus-main {
+      height: calc(100vh / var(--chronos-desktop-scale));
+    }
+  }
+}
+
+@supports not (zoom: 1) {
+  @media (min-width: 1280px) {
+    .desktop-app-scale {
+      width: calc(100% / var(--chronos-desktop-scale));
+      min-height: calc(100vh / var(--chronos-desktop-scale));
+      transform: scale(var(--chronos-desktop-scale));
+    }
+
+    .desktop-focus-shell,
+    .desktop-focus-main {
+      height: calc(100vh / var(--chronos-desktop-scale));
+    }
+  }
 }

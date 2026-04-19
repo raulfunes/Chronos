@@ -84,51 +84,6 @@ export function SettingsPage() {
                 onChange={(event) => setForm((current) => ({ ...current, desktopNotifications: event.target.checked }))}
               />
             </label>
-            <label className="flex items-center justify-between rounded-2xl border border-outline/10 bg-background px-4 py-4">
-              <span>Session audio enabled</span>
-              <input
-                type="checkbox"
-                checked={form.soundEnabled}
-                onChange={(event) => setForm((current) => ({ ...current, soundEnabled: event.target.checked }))}
-              />
-            </label>
-            <label className="block rounded-2xl border border-outline/10 bg-background px-4 py-4">
-              <span className="block text-xs uppercase tracking-[0.2em] text-on-surface-variant">Ambient sound</span>
-              <select
-                className="mt-3 w-full bg-transparent outline-none"
-                value={form.ambientSound}
-                onChange={(event) => setForm((current) => ({ ...current, ambientSound: event.target.value as typeof form.ambientSound }))}
-              >
-                <option value="NONE">Muted</option>
-                <option value="RAIN">Rain</option>
-                <option value="RIVER">River</option>
-                <option value="WHITE_NOISE">White noise</option>
-              </select>
-            </label>
-            <label className="block rounded-2xl border border-outline/10 bg-background px-4 py-4">
-              <span className="block text-xs uppercase tracking-[0.2em] text-on-surface-variant">
-                Ambient volume {form.ambientVolume}%
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                className="mt-3 w-full accent-primary"
-                value={form.ambientVolume}
-                onChange={(event) => setForm((current) => ({ ...current, ambientVolume: Number(event.target.value) }))}
-              />
-            </label>
-            <label className="block rounded-2xl border border-outline/10 bg-background px-4 py-4">
-              <span className="block text-xs uppercase tracking-[0.2em] text-on-surface-variant">Audio scope</span>
-              <select
-                className="mt-3 w-full bg-transparent outline-none"
-                value={form.audioScope}
-                onChange={(event) => setForm((current) => ({ ...current, audioScope: event.target.value as typeof form.audioScope }))}
-              >
-                <option value="FOCUS_ONLY">Only pomodoro</option>
-                <option value="ALL_SESSIONS">All session types</option>
-              </select>
-            </label>
             <label className="block rounded-2xl border border-outline/10 bg-background px-4 py-4">
               <span className="block text-xs uppercase tracking-[0.2em] text-on-surface-variant">Theme id</span>
               <input
@@ -139,7 +94,13 @@ export function SettingsPage() {
             </label>
             <button
               className="w-full rounded-2xl bg-primary px-4 py-4 text-sm font-bold uppercase tracking-[0.25em] text-background"
-              onClick={() => void updateSettings(form)}
+              onClick={() => void updateSettings({
+                focusMinutes: form.focusMinutes,
+                shortBreakMinutes: form.shortBreakMinutes,
+                longBreakMinutes: form.longBreakMinutes,
+                desktopNotifications: form.desktopNotifications,
+                theme: form.theme,
+              })}
             >
               Save settings
             </button>
@@ -235,8 +196,7 @@ export function SettingsPage() {
 
           {spotifyAccounts.length > 0 ? (
             <p className="mt-4 text-sm text-on-surface-variant">
-              Spotify playlist selection now lives in <span className="font-semibold">Focus</span>, under the session
-              audio panel.
+              Spotify playlist selection now lives in <span className="font-semibold">Focus</span> and stays local to this browser.
             </p>
           ) : null}
         </Panel>

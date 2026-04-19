@@ -1,11 +1,19 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ApiError, api } from './api';
-import { DEFAULT_SETTINGS } from './constants';
-import { readAuth, readGuestState, writeAuth, writeGuestState } from './storage';
+import { DEFAULT_FOCUS_AUDIO_PREFERENCES, DEFAULT_SETTINGS } from './constants';
+import {
+  readAuth,
+  readFocusAudioPreferences,
+  readGuestState,
+  writeAuth,
+  writeFocusAudioPreferences,
+  writeGuestState,
+} from './storage';
 import {
   AnalyticsSummary,
   AuthResponse,
   CalendarEntry,
+  FocusAudioPreferences,
   FocusSession,
   FocusSessionInput,
   Goal,
@@ -23,6 +31,11 @@ import {
   UserSettings,
 } from '../types';
 
+interface ChronosUiError {
+  id: number;
+  message: string;
+}
+
 interface ChronosContextValue {
   auth: AuthResponse | null;
   goals: Goal[];
@@ -30,12 +43,13 @@ interface ChronosContextValue {
   sessions: FocusSession[];
   calendar: CalendarEntry[];
   settings: UserSettings;
+  focusAudio: FocusAudioPreferences;
   integrations: IntegrationAccount[];
   analytics: AnalyticsSummary | null;
   isReady: boolean;
   isAuthenticated: boolean;
   isGuest: boolean;
-  error: string | null;
+  error: ChronosUiError | null;
   login(payload: { email: string; password: string }): Promise<void>;
   register(payload: { displayName: string; email: string; password: string }): Promise<void>;
   loginAsGuest(): Promise<void>;
@@ -52,6 +66,7 @@ interface ChronosContextValue {
   completeSession(id: number): Promise<void>;
   deleteSession(id: number): Promise<void>;
   updateSettings(payload: SettingsInput): Promise<void>;
+  updateFocusAudio(payload: Partial<FocusAudioPreferences>): void;
   startIntegrationConnect(provider: IntegrationProvider): Promise<string | null>;
   disconnectIntegration(accountId: number): Promise<void>;
   updateIntegrationConfig(accountId: number, config: Record<string, unknown>): Promise<void>;
@@ -59,6 +74,7 @@ interface ChronosContextValue {
   getIntegrationLinks(accountId: number): Promise<IntegrationLink[]>;
   createIntegrationLink(accountId: number, payload: IntegrationLinkInput): Promise<IntegrationLink | void>;
   deleteIntegrationLink(accountId: number, linkId: number): Promise<void>;
+  showError(message: string): void;
   clearError(): void;
 }
 
@@ -84,10 +100,19 @@ function durationToSeconds(durationMinutes: number) {
   return durationMinutes * 60;
 }
 
+function isFocusCreditedSession(session: FocusSession) {
+  return session.type === 'POMODORO'
+    && (session.status === 'COMPLETED' || session.status === 'SKIPPED');
+}
+
 function normalizeSession(session: FocusSession): FocusSession {
   return {
     ...session,
-    remainingSeconds: session.remainingSeconds ?? (session.status === 'COMPLETED' ? 0 : durationToSeconds(session.durationMinutes)),
+    remainingSeconds: session.remainingSeconds ?? (
+      session.status === 'COMPLETED' || session.status === 'SKIPPED'
+        ? 0
+        : durationToSeconds(session.durationMinutes)
+    ),
     lastResumedAt: session.lastResumedAt ?? (session.status === 'RUNNING' ? session.startedAt : null),
   };
 }
@@ -139,6 +164,18 @@ function completeSessionState(session: FocusSession, referenceDate: Date): Focus
   };
 }
 
+function skipSessionState(session: FocusSession, referenceDate: Date): FocusSession {
+  const nowIso = referenceDate.toISOString();
+  return {
+    ...session,
+    status: 'SKIPPED',
+    remainingSeconds: 0,
+    startedAt: session.startedAt ?? nowIso,
+    lastResumedAt: null,
+    completedAt: null,
+  };
+}
+
 function cancelSessionState(session: FocusSession, referenceDate: Date): FocusSession {
   return {
     ...session,
@@ -178,6 +215,8 @@ function applySessionStatus(session: FocusSession, status: SessionStatus, refere
           };
     case 'COMPLETED':
       return completeSessionState(normalizedSession, referenceDate);
+    case 'SKIPPED':
+      return skipSessionState(normalizedSession, referenceDate);
     case 'CANCELLED':
       return cancelSessionState(normalizedSession, referenceDate);
     case 'SCHEDULED':
@@ -185,13 +224,25 @@ function applySessionStatus(session: FocusSession, status: SessionStatus, refere
   }
 }
 
+function markTaskDoneIfNeeded(tasks: Task[], session: FocusSession) {
+  if (session.status !== 'COMPLETED' || session.type !== 'POMODORO' || !session.taskId) {
+    return tasks;
+  }
+
+  return tasks.map((task) =>
+    task.id === session.taskId
+      ? { ...task, status: 'DONE' as const }
+      : task,
+  );
+}
+
 function createAnalytics(goals: Goal[], tasks: Task[], sessions: FocusSession[]): AnalyticsSummary {
   const focusMinutes = sessions
-    .filter((session) => session.status === 'COMPLETED')
+    .filter((session) => isFocusCreditedSession(session))
     .reduce((sum, session) => sum + session.durationMinutes, 0);
   const completionDays = new Set(
     sessions
-      .filter((session) => session.completedAt)
+      .filter((session) => session.status === 'COMPLETED' && session.completedAt)
       .map((session) => new Date(session.completedAt as string).toISOString().slice(0, 10)),
   );
 
@@ -241,6 +292,14 @@ function rehydrateGuest(): GuestState {
   };
 }
 
+function getFocusAudioScope(auth: AuthResponse | null) {
+  if (!auth || auth.role === 'GUEST') {
+    return 'guest';
+  }
+
+  return `user:${auth.userId}`;
+}
+
 export function ChronosProvider({ children }: { children: React.ReactNode }) {
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -248,10 +307,11 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [calendar, setCalendar] = useState<CalendarEntry[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [focusAudio, setFocusAudio] = useState<FocusAudioPreferences>(DEFAULT_FOCUS_AUDIO_PREFERENCES);
   const [integrations, setIntegrations] = useState<IntegrationAccount[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ChronosUiError | null>(null);
 
   const isAuthenticated = Boolean(auth);
   const isGuest = auth?.role === 'GUEST';
@@ -270,6 +330,8 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    setFocusAudio(readFocusAudioPreferences(getFocusAudioScope(auth)));
+
     if (auth.role === 'GUEST') {
       const guest = rehydrateGuest();
       setGoals(guest.goals);
@@ -285,6 +347,17 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
 
     void refresh().finally(() => setIsReady(true));
   }, [auth?.token, auth?.role]);
+
+  const showError = useCallback((message: string) => {
+    setError({
+      id: Date.now() + Math.random(),
+      message,
+    });
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   async function refresh() {
     if (!auth) {
@@ -327,7 +400,7 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         logout();
       }
-      setError(err instanceof Error ? err.message : 'Failed to refresh application');
+      showError(err instanceof Error ? err.message : 'Failed to refresh application');
     }
   }
 
@@ -373,6 +446,7 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
     setCalendar([]);
     setAnalytics(null);
     setSettings(DEFAULT_SETTINGS);
+    setFocusAudio(DEFAULT_FOCUS_AUDIO_PREFERENCES);
     setIntegrations([]);
     writeAuth(null);
   }
@@ -382,7 +456,7 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       await action();
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
+      showError(err instanceof Error ? err.message : 'Request failed');
       throw err;
     }
   }
@@ -546,7 +620,8 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       const nextSessions = nextSession.status === 'RUNNING'
         ? guest.sessions.map((item) => item.status === 'RUNNING' ? pauseSessionState(item, referenceDate) : item)
         : guest.sessions;
-      hydrateGuestState({ ...guest, sessions: [nextSession, ...nextSessions] });
+      const nextTasks = markTaskDoneIfNeeded(guest.tasks, nextSession);
+      hydrateGuestState({ ...guest, tasks: nextTasks, sessions: [nextSession, ...nextSessions] });
       return nextSession;
     }
     let createdSession: FocusSession | undefined;
@@ -591,8 +666,10 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
         }
         return session;
       });
+      const nextTasks = markTaskDoneIfNeeded(guest.tasks, nextSession);
       hydrateGuestState({
         ...guest,
+        tasks: nextTasks,
         sessions: nextSessions,
       });
       return;
@@ -613,7 +690,12 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
           : session,
       );
       const nextTasks = guest.tasks.map((task) =>
-        nextSessions.some((session) => session.id === id && session.taskId === task.id)
+        nextSessions.some((session) =>
+          session.id === id
+            && session.taskId === task.id
+            && session.type === 'POMODORO'
+            && session.status === 'COMPLETED'
+        )
           ? { ...task, status: 'DONE' as const }
           : task,
       );
@@ -652,6 +734,15 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
     await withRemoteMutation(async () => {
       await api.updateSettings(auth.token ?? '', payload);
       await refresh();
+    });
+  }
+
+  function updateFocusAudio(payload: Partial<FocusAudioPreferences>) {
+    const scope = getFocusAudioScope(auth);
+    setFocusAudio((current) => {
+      const nextValue = { ...current, ...payload };
+      writeFocusAudioPreferences(scope, nextValue);
+      return nextValue;
     });
   }
 
@@ -694,7 +785,13 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
     let response: IntegrationTokenRefreshResponse | null = null;
     await withRemoteMutation(async () => {
       response = await api.refreshIntegrationToken(auth.token ?? '', accountId);
-      await refresh();
+      if (response) {
+        setIntegrations((current) => current.map((integration) => (
+          integration.id === accountId
+            ? { ...integration, tokenExpiresAt: response.expiresAt }
+            : integration
+        )));
+      }
     });
     return response;
   }
@@ -708,7 +805,7 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       return links;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
+      showError(err instanceof Error ? err.message : 'Request failed');
       throw err;
     }
   }
@@ -733,10 +830,6 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
     });
   }
 
-  function clearError() {
-    setError(null);
-  }
-
   const value = useMemo(
     () => ({
       auth,
@@ -745,6 +838,7 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       sessions,
       calendar,
       settings,
+      focusAudio,
       integrations,
       analytics,
       isReady,
@@ -767,6 +861,7 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       completeSession,
       deleteSession,
       updateSettings,
+      updateFocusAudio,
       startIntegrationConnect,
       disconnectIntegration,
       updateIntegrationConfig,
@@ -774,9 +869,10 @@ export function ChronosProvider({ children }: { children: React.ReactNode }) {
       getIntegrationLinks,
       createIntegrationLink,
       deleteIntegrationLink,
+      showError,
       clearError,
     }),
-    [auth, goals, tasks, sessions, calendar, settings, integrations, analytics, isReady, isAuthenticated, isGuest, error],
+    [auth, goals, tasks, sessions, calendar, settings, focusAudio, integrations, analytics, isReady, isAuthenticated, isGuest, error],
   );
 
   return <ChronosContext.Provider value={value}>{children}</ChronosContext.Provider>;

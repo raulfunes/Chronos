@@ -2,7 +2,7 @@ export type GoalStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'DONE';
 export type GoalPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 export type SessionType = 'POMODORO' | 'SHORT_BREAK' | 'LONG_BREAK';
-export type SessionStatus = 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+export type SessionStatus = 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED';
 export type UserRole = 'USER' | 'GUEST';
 export type AmbientSound = 'NONE' | 'RAIN' | 'RIVER' | 'WHITE_NOISE';
 export type AudioScope = 'FOCUS_ONLY' | 'ALL_SESSIONS';
@@ -86,11 +86,7 @@ export interface TimerPreset {
 export interface UserSettings extends TimerPreset {
   id: number;
   desktopNotifications: boolean;
-  soundEnabled: boolean;
   theme: string;
-  ambientSound: AmbientSound;
-  ambientVolume: number;
-  audioScope: AudioScope;
 }
 
 export interface AnalyticsSummary {
@@ -137,11 +133,17 @@ export interface SettingsInput {
   shortBreakMinutes?: number;
   longBreakMinutes?: number;
   desktopNotifications?: boolean;
-  soundEnabled?: boolean;
   theme?: string;
-  ambientSound?: AmbientSound;
-  ambientVolume?: number;
-  audioScope?: AudioScope;
+}
+
+export interface FocusAudioPreferences {
+  soundEnabled: boolean;
+  ambientSound: AmbientSound;
+  ambientVolume: number;
+  audioScope: AudioScope;
+  spotifyPlaylistUri: string;
+  spotifyPlaylistName: string;
+  spotifyVolume: number;
 }
 
 export interface IntegrationAccount {

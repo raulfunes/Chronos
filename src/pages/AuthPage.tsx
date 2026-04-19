@@ -5,16 +5,15 @@ import { useChronos } from '../lib/chronos-context';
 
 export function AuthPage() {
   const navigate = useNavigate();
-  const { login, register, loginAsGuest } = useChronos();
+  const { login, register, loginAsGuest, showError, clearError } = useChronos();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({ displayName: '', email: '', password: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSubmitting(true);
-    setError(null);
+    clearError();
     try {
       if (mode === 'login') {
         await login({ email: form.email, password: form.password });
@@ -23,7 +22,7 @@ export function AuthPage() {
       }
       navigate('/focus');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Auth failed');
+      showError(err instanceof Error ? err.message : 'Auth failed');
     } finally {
       setSubmitting(false);
     }
@@ -31,12 +30,12 @@ export function AuthPage() {
 
   async function handleGuest() {
     setSubmitting(true);
-    setError(null);
+    clearError();
     try {
       await loginAsGuest();
       navigate('/focus');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Guest session failed');
+      showError(err instanceof Error ? err.message : 'Guest session failed');
     } finally {
       setSubmitting(false);
     }
@@ -119,8 +118,6 @@ export function AuthPage() {
                 minLength={8}
               />
             </label>
-
-            {error && <p className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">{error}</p>}
 
             <button className="w-full rounded-2xl bg-linear-to-r from-primary to-primary-container px-4 py-4 font-headline text-sm font-bold uppercase tracking-[0.25em] text-background" disabled={submitting}>
               {submitting ? 'Processing' : mode === 'login' ? 'Enter Chronos' : 'Create workspace'}
