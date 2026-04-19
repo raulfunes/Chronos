@@ -131,6 +131,36 @@ class FocusSessionServiceTest {
     }
 
     @Test
+    void createCompletedPomodoroMarksLinkedTaskDone() {
+        AppUser user = createUser("custom-complete@example.com");
+        TaskItem task = createTask(user, "Finish execution flow");
+
+        FocusSessionResponse created = focusSessionService.create(
+            user.getId(),
+            request(null, task.getId(), SessionType.POMODORO, SessionStatus.COMPLETED, 25)
+        );
+
+        assertThat(created.status()).isEqualTo(SessionStatus.COMPLETED);
+        assertThat(taskRepository.findById(task.getId()).orElseThrow().getStatus()).isEqualTo(TaskStatus.DONE);
+    }
+
+    @Test
+    void createSkippedPomodoroKeepsTaskOpenAndZerosRemainingTime() {
+        AppUser user = createUser("custom-skip@example.com");
+        TaskItem task = createTask(user, "Draft plan");
+
+        FocusSessionResponse skipped = focusSessionService.create(
+            user.getId(),
+            request(null, task.getId(), SessionType.POMODORO, SessionStatus.SKIPPED, 8)
+        );
+
+        assertThat(skipped.status()).isEqualTo(SessionStatus.SKIPPED);
+        assertThat(skipped.remainingSeconds()).isZero();
+        assertThat(skipped.completedAt()).isNull();
+        assertThat(taskRepository.findById(task.getId()).orElseThrow().getStatus()).isEqualTo(TaskStatus.TODO);
+    }
+
+    @Test
     void startingAnotherRunningSessionAutoPausesPreviousOne() {
         AppUser user = createUser("auto-pause@example.com");
         FocusSessionResponse firstSession = focusSessionService.create(

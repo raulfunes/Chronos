@@ -5,5 +5,6 @@ public enum SessionStatus {
     RUNNING,
     PAUSED,
     COMPLETED,
+    SKIPPED,
     CANCELLED
 }

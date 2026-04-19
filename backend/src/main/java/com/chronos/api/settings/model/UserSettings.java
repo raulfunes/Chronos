@@ -4,8 +4,6 @@ import com.chronos.api.common.model.BaseEntity;
 import com.chronos.api.user.model.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
@@ -32,21 +30,7 @@ public class UserSettings extends BaseEntity {
     private Boolean desktopNotifications = true;
 
     @Column(nullable = false)
-    private Boolean soundEnabled = true;
-
-    @Column(nullable = false)
     private String theme = "obsidian-sanctuary";
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AmbientSound ambientSound = AmbientSound.NONE;
-
-    @Column(nullable = false)
-    private Integer ambientVolume = 35;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private AudioScope audioScope = AudioScope.FOCUS_ONLY;
 
     public AppUser getUser() {
         return user;
@@ -88,43 +72,11 @@ public class UserSettings extends BaseEntity {
         this.desktopNotifications = desktopNotifications;
     }
 
-    public Boolean getSoundEnabled() {
-        return soundEnabled;
-    }
-
-    public void setSoundEnabled(Boolean soundEnabled) {
-        this.soundEnabled = soundEnabled;
-    }
-
     public String getTheme() {
         return theme;
     }
 
     public void setTheme(String theme) {
         this.theme = theme;
-    }
-
-    public AmbientSound getAmbientSound() {
-        return ambientSound;
-    }
-
-    public void setAmbientSound(AmbientSound ambientSound) {
-        this.ambientSound = ambientSound;
-    }
-
-    public Integer getAmbientVolume() {
-        return ambientVolume;
-    }
-
-    public void setAmbientVolume(Integer ambientVolume) {
-        this.ambientVolume = ambientVolume;
-    }
-
-    public AudioScope getAudioScope() {
-        return audioScope;
-    }
-
-    public void setAudioScope(AudioScope audioScope) {
-        this.audioScope = audioScope;
     }
 }

@@ -4,6 +4,7 @@ import com.chronos.api.analytics.dto.AnalyticsSummaryResponse;
 import com.chronos.api.goal.model.GoalStatus;
 import com.chronos.api.goal.repository.GoalRepository;
 import com.chronos.api.goal.service.GoalService;
+import com.chronos.api.session.model.SessionType;
 import com.chronos.api.session.model.SessionStatus;
 import com.chronos.api.session.repository.FocusSessionRepository;
 import com.chronos.api.task.model.TaskStatus;
@@ -43,7 +44,8 @@ public class AnalyticsService {
         var sessions = focusSessionRepository.findAllByUserIdOrderByScheduledForAscCreatedAtAsc(userId);
         long completedSessions = sessions.stream().filter(session -> session.getStatus() == SessionStatus.COMPLETED).count();
         long focusMinutes = sessions.stream()
-            .filter(session -> session.getStatus() == SessionStatus.COMPLETED)
+            .filter(session -> session.getType() == SessionType.POMODORO)
+            .filter(session -> session.getStatus() == SessionStatus.COMPLETED || session.getStatus() == SessionStatus.SKIPPED)
             .mapToLong(session -> session.getDurationMinutes().longValue())
             .sum();
         long currentStreak = calculateStreak(sessions);
@@ -59,7 +61,7 @@ public class AnalyticsService {
 
     private long calculateStreak(List<com.chronos.api.session.model.FocusSession> sessions) {
         List<LocalDate> completionDays = sessions.stream()
-            .filter(session -> session.getCompletedAt() != null)
+            .filter(session -> session.getStatus() == SessionStatus.COMPLETED && session.getCompletedAt() != null)
             .map(session -> LocalDate.ofInstant(session.getCompletedAt(), ZoneOffset.UTC))
             .distinct()
             .sorted(Comparator.reverseOrder())

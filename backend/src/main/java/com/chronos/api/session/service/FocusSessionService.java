@@ -56,6 +56,7 @@ public class FocusSessionService {
         FocusSession session = new FocusSession();
         session.setUser(getUser(userId));
         apply(userId, session, request, true);
+        maybeMarkLinkedTaskDone(session);
         FocusSession savedSession = focusSessionRepository.save(session);
         log.info(
             "Created focus session userId={} sessionId={} status={} type={} durationMinutes={} goalId={} taskId={}",
@@ -75,6 +76,7 @@ public class FocusSessionService {
         FocusSession session = getOwnedSession(userId, sessionId);
         SessionStatus previousStatus = session.getStatus();
         apply(userId, session, request, false);
+        maybeMarkLinkedTaskDone(session);
         FocusSession savedSession = focusSessionRepository.save(session);
         log.info(
             "Updated focus session userId={} sessionId={} previousStatus={} nextStatus={} type={} durationMinutes={}",
@@ -92,16 +94,16 @@ public class FocusSessionService {
     public FocusSessionResponse complete(Long userId, Long sessionId) {
         FocusSession session = getOwnedSession(userId, sessionId);
         completeSessionState(session, Instant.now());
-        if (session.getTask() != null) {
-            session.getTask().setStatus(TaskStatus.DONE);
-        }
+        maybeMarkLinkedTaskDone(session);
         FocusSession savedSession = focusSessionRepository.save(session);
         log.info(
             "Completed focus session userId={} sessionId={} taskId={} taskMarkedDone={}",
             userId,
             savedSession.getId(),
             savedSession.getTask() == null ? null : savedSession.getTask().getId(),
-            savedSession.getTask() != null
+            savedSession.getStatus() == SessionStatus.COMPLETED
+                && savedSession.getType() == com.chronos.api.session.model.SessionType.POMODORO
+                && savedSession.getTask() != null
         );
         return toResponse(savedSession);
     }
@@ -177,6 +179,7 @@ public class FocusSessionService {
             case RUNNING -> resumeSession(userId, session, now);
             case PAUSED -> pauseSession(session, previousStatus, now);
             case COMPLETED -> completeSessionState(session, now);
+            case SKIPPED -> skipSession(session, now);
             case CANCELLED -> cancelSession(session, previousStatus, now);
             case SCHEDULED -> scheduleSession(session);
         }
@@ -218,6 +221,16 @@ public class FocusSessionService {
         session.setRemainingSeconds(0);
         session.setLastResumedAt(null);
         session.setCompletedAt(now);
+    }
+
+    private void skipSession(FocusSession session, Instant now) {
+        session.setStatus(SessionStatus.SKIPPED);
+        if (session.getStartedAt() == null) {
+            session.setStartedAt(now);
+        }
+        session.setRemainingSeconds(0);
+        session.setLastResumedAt(null);
+        session.setCompletedAt(null);
     }
 
     private void cancelSession(FocusSession session, SessionStatus previousStatus, Instant now) {
@@ -276,5 +289,13 @@ public class FocusSessionService {
 
     private int durationToSeconds(Integer durationMinutes) {
         return durationMinutes * SECONDS_PER_MINUTE;
+    }
+
+    private void maybeMarkLinkedTaskDone(FocusSession session) {
+        if (session.getStatus() == SessionStatus.COMPLETED
+            && session.getType() == com.chronos.api.session.model.SessionType.POMODORO
+            && session.getTask() != null) {
+            session.getTask().setStatus(TaskStatus.DONE);
+        }
     }
 }

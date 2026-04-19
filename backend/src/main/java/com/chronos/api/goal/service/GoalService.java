@@ -83,9 +83,17 @@ public class GoalService {
 
     @Transactional
     public void delete(Long userId, Long goalId) {
-        Goal goal = getOwnedGoal(userId, goalId);
-        goalRepository.delete(goal);
-        log.info("Deleted goal userId={} goalId={}", userId, goal.getId());
+        getOwnedGoal(userId, goalId);
+        int detachedTaskCount = taskRepository.clearGoalReferences(userId, goalId);
+        int detachedSessionCount = focusSessionRepository.clearGoalReferences(userId, goalId);
+        goalRepository.deleteById(goalId);
+        log.info(
+            "Deleted goal userId={} goalId={} detachedTaskCount={} detachedSessionCount={}",
+            userId,
+            goalId,
+            detachedTaskCount,
+            detachedSessionCount
+        );
     }
 
     @Transactional(readOnly = true)

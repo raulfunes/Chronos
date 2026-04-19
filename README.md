@@ -48,6 +48,7 @@ Notas de integraciones:
 - `CHRONOS_INTEGRATIONS_ENCRYPTION_KEY` cifra las credenciales persistidas de providers.
 - `CHRONOS_FRONTEND_BASE_URL` define la URL a la que redirige el callback OAuth cuando termina una conexión.
 - Spotify queda soportado como primer provider OAuth persistente. Para habilitarlo, hay que cargar las variables y registrar el redirect URI en Spotify Developer Dashboard.
+- El playback en navegador usa Spotify Web Playback SDK: requiere cuenta Spotify Premium y, en algunos navegadores, un click previo en "Enable Browser Player" para destrabar autoplay.
 - Jira ya tiene lugar en la arquitectura genérica, pero su integración remota todavía no está implementada.
 
 ## Ejecutar localmente
@@ -139,14 +140,16 @@ Estado actual:
 
 - Settings y Focus ya consumen la arquitectura genérica de integraciones.
 - Spotify ya puede persistir su conexión y su config por cuenta conectada.
-- El playback embebido con Web Playback SDK todavía no está implementado; esta entrega deja lista la base de datos, APIs, cifrado y UI de configuración para construirlo encima.
+- Las preferencias operativas de audio viven en `localStorage` del navegador, no en `user_settings`.
+- Focus ya puede cargar playlists del usuario conectado, activar el device web de Spotify y controlar play/pause/previous/next dentro de la app.
+- El refresh del access token de Spotify ya no dispara un `refresh()` completo del estado de Chronos; sólo actualiza el vencimiento de la integración para que el player sea más liviano.
+- TypeScript ahora revisa sólo el frontend de la app (`src/` y `vite.config.ts`), evitando que ejemplos auxiliares del repo rompan `npm run lint`.
 
 ## Verificación usada
 
 ```bash
 npm run lint
 npm run build
-cd backend && mvn test
 ```
 
 ## Notas actuales

@@ -44,34 +44,18 @@ public class UserSettingsService {
         if (request.desktopNotifications() != null) {
             settings.setDesktopNotifications(request.desktopNotifications());
         }
-        if (request.soundEnabled() != null) {
-            settings.setSoundEnabled(request.soundEnabled());
-        }
         if (request.theme() != null) {
             settings.setTheme(request.theme());
         }
-        if (request.ambientSound() != null) {
-            settings.setAmbientSound(request.ambientSound());
-        }
-        if (request.ambientVolume() != null) {
-            settings.setAmbientVolume(request.ambientVolume());
-        }
-        if (request.audioScope() != null) {
-            settings.setAudioScope(request.audioScope());
-        }
         UserSettings savedSettings = userSettingsRepository.save(settings);
         log.info(
-            "Updated settings userId={} focusMinutes={} shortBreakMinutes={} longBreakMinutes={} desktopNotifications={} soundEnabled={} theme={} ambientSound={} ambientVolume={} audioScope={}",
+            "Updated settings userId={} focusMinutes={} shortBreakMinutes={} longBreakMinutes={} desktopNotifications={} theme={}",
             userId,
             savedSettings.getFocusMinutes(),
             savedSettings.getShortBreakMinutes(),
             savedSettings.getLongBreakMinutes(),
             savedSettings.getDesktopNotifications(),
-            savedSettings.getSoundEnabled(),
-            savedSettings.getTheme(),
-            savedSettings.getAmbientSound(),
-            savedSettings.getAmbientVolume(),
-            savedSettings.getAudioScope()
+            savedSettings.getTheme()
         );
         return toResponse(savedSettings);
     }
@@ -92,11 +76,7 @@ public class UserSettingsService {
             settings.getShortBreakMinutes(),
             settings.getLongBreakMinutes(),
             settings.getDesktopNotifications(),
-            settings.getSoundEnabled(),
-            settings.getTheme(),
-            settings.getAmbientSound(),
-            settings.getAmbientVolume(),
-            settings.getAudioScope()
+            settings.getTheme()
         );
     }
 }

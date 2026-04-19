@@ -6,6 +6,7 @@ import com.chronos.api.goal.service.GoalService;
 import com.chronos.api.task.dto.TaskRequest;
 import com.chronos.api.task.dto.TaskResponse;
 import com.chronos.api.task.model.TaskItem;
+import com.chronos.api.session.repository.FocusSessionRepository;
 import com.chronos.api.task.repository.TaskRepository;
 import com.chronos.api.user.model.AppUser;
 import com.chronos.api.user.repository.AppUserRepository;
@@ -23,11 +24,18 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final AppUserRepository appUserRepository;
     private final GoalService goalService;
+    private final FocusSessionRepository focusSessionRepository;
 
-    public TaskService(TaskRepository taskRepository, AppUserRepository appUserRepository, GoalService goalService) {
+    public TaskService(
+        TaskRepository taskRepository,
+        AppUserRepository appUserRepository,
+        GoalService goalService,
+        FocusSessionRepository focusSessionRepository
+    ) {
         this.taskRepository = taskRepository;
         this.appUserRepository = appUserRepository;
         this.goalService = goalService;
+        this.focusSessionRepository = focusSessionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -70,9 +78,10 @@ public class TaskService {
 
     @Transactional
     public void delete(Long userId, Long taskId) {
-        TaskItem task = getOwnedTask(userId, taskId);
-        taskRepository.delete(task);
-        log.info("Deleted task userId={} taskId={}", userId, task.getId());
+        getOwnedTask(userId, taskId);
+        int detachedSessionCount = focusSessionRepository.clearTaskReferences(userId, taskId);
+        taskRepository.deleteById(taskId);
+        log.info("Deleted task userId={} taskId={} detachedSessionCount={}", userId, taskId, detachedSessionCount);
     }
 
     @Transactional(readOnly = true)
